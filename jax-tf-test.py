@@ -47,6 +47,20 @@ def filter_vec(p_proj, C_proj, H, G, m):
 
     return p, C
 
+def filter_vec_np(p_proj, C_proj, H, G, m):
+
+    HG = H.T @ G
+
+    # Innermost two axes must be 'matrix'
+    inv_C_proj = jnp.linalg.inv(C_proj)
+
+    C = np.linalg.inv(inv_C_proj + HG @ H)
+
+    p = np.einsum('Bij,Bj->Bi', inv_C_proj, p_proj) + np.einsum('ji,iB->Bj', HG, m)
+    p = np.einsum('Bij,Bj->Bi', C, p)
+
+    return p, C
+
 @jit
 def filter_novec(p_proj, C_proj, H, G, m):
 
@@ -84,6 +98,7 @@ if __name__ == '__main__':
 
     time_tf_list = []
     time_vec_list = []
+    time_vec_np_list = []
     time_autovec_list = []
 
     for n_batch in tqdm(batch_sizes):
@@ -100,21 +115,41 @@ if __name__ == '__main__':
         mB = np.random.normal(size = (n_batch, 4)).T
         m = mB[:, 0]
 
-        p_f_tf, C_f_tf = filter_tf(pB, CB, H, G, mB)
+        pB_tf = tf.convert_to_tensor(pB)
+        CB_tf = tf.convert_to_tensor(CB)
+        H_tf = tf.convert_to_tensor(H)
+        G_tf = tf.convert_to_tensor(G)
+        mB_tf = tf.convert_to_tensor(mB)
+
+        p_f_tf, C_f_tf = filter_tf(pB_tf, CB_tf, H_tf, G_tf, mB_tf)
         start = time.perf_counter()
-        for i in range(20) : p_f_tf, C_f_tf = filter_tf(pB, CB, H, G, mB)
+        for i in range(20) : p_f_tf, C_f_tf = filter_tf(pB_tf, CB_tf, H_tf, G_tf, mB_tf)
         stop = time.perf_counter()
         time_tf = (stop - start) / 20.
 
         time_tf_list.append(time_tf)
 
-        p_f_v, C_f_v = filter_vec(pB, CB, H, G, mB)
+        pB_j = jnp.array(pB)
+        CB_j = jnp.array(CB)
+        H_j = jnp.array(H)
+        G_j = jnp.array(G)
+        mB_j = jnp.array(mB)
+
+        p_f_v, C_f_v = filter_vec(pB_j, CB_j, H_j, G_j, mB_j)
         start = time.perf_counter()
-        for i in range(20) : p_f_v, C_f_v = filter_vec(pB, CB, H, G, mB)
+        for i in range(20) : p_f_v, C_f_v = filter_vec(pB_j, CB_j, H_j, G_j, mB_j)
         stop = time.perf_counter()
         time_vec = (stop - start) / 20.
 
         time_vec_list.append(time_vec)
+
+        p_f_v, C_f_v = filter_vec_np(pB, CB, H, G, mB)
+        start = time.perf_counter()
+        for i in range(20) : p_f_v, C_f_v = filter_vec_np(pB, CB, H, G, mB)
+        stop = time.perf_counter()
+        time_vec_np = (stop - start) / 20.
+
+        time_vec_np_list.append(time_vec_np)
 
         # p_f_nv, C_f_nv = filter_novec(p, C, H, G, m)
         # start = time.perf_counter()
@@ -124,9 +159,9 @@ if __name__ == '__main__':
 
         filter_vmap = jit(vmap(filter_novec, in_axes=(0, 0, None, None, 1)))
 
-        p_f_av, C_f_av = filter_vmap(pB, CB, H, G, mB)
+        p_f_av, C_f_av = filter_vmap(pB_j, CB_j, H_j, G_j, mB_j)
         start = time.perf_counter()
-        for i in range(20) : p_f_av, C_f_av = filter_vmap(pB, CB, H, G, mB)
+        for i in range(20) : p_f_av, C_f_av = filter_vmap(pB_j, CB_j, H_j, G_j, mB_j)
         stop = time.perf_counter()
         time_autovec = (stop - start) / 20.
 
@@ -142,6 +177,7 @@ if __name__ == '__main__':
 
     ax.plot(batch_sizes, time_tf_list, label = 'TF')
     ax.plot(batch_sizes, time_vec_list, label = 'Vec')
+    ax.plot(batch_sizes, time_vec_np_list, label = 'VecNP')
     ax.plot(batch_sizes, time_autovec_list, label = 'AutoVec')
 
     ax.set_yscale('log')
