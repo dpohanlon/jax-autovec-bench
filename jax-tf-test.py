@@ -9,6 +9,29 @@ from pprint import pprint
 
 import time
 
+from tqdm import tqdm
+
+import matplotlib.pyplot as plt
+
+from matplotlib import rcParams
+import matplotlib as mpl
+mpl.use('Agg')
+
+plt.style.use(['seaborn-whitegrid', 'seaborn-ticks'])
+
+rcParams['figure.figsize'] = 12, 8
+rcParams['axes.facecolor'] = 'FFFFFF'
+rcParams['savefig.facecolor'] = 'FFFFFF'
+rcParams['figure.facecolor'] = 'FFFFFF'
+
+rcParams['xtick.direction'] = 'in'
+rcParams['ytick.direction'] = 'in'
+
+rcParams['mathtext.fontset'] = 'cm'
+rcParams['mathtext.rm'] = 'serif'
+
+rcParams.update({'figure.autolayout': True})
+
 @jit
 def filter_vec(p_proj, C_proj, H, G, m):
 
@@ -57,52 +80,71 @@ if __name__ == '__main__':
 
     import time
 
-    n_batch = 1024
+    batch_sizes = np.array([2 ** x for x in range(21)])
 
-    pB = np.random.normal(size = (n_batch, 4))
-    CB = np.random.normal(size = (n_batch, 4, 4))
+    time_tf_list = []
+    time_vec_list = []
+    time_autovec_list = []
 
-    p = pB[0]
-    C = CB[0]
+    for n_batch in tqdm(batch_sizes):
 
-    H = np.ones((4, 4))
-    G = np.ones((4, 4))
+        pB = np.random.normal(size = (n_batch, 4))
+        CB = np.random.normal(size = (n_batch, 4, 4))
 
-    mB = np.random.normal(size = (n_batch, 4)).T
-    m = mB[:, 0]
+        p = pB[0]
+        C = CB[0]
 
-    p_f_tf, C_f_tf = filter_tf(pB, CB, H, G, mB)
-    start = time.perf_counter()
-    for i in range(100) : p_f_tf, C_f_tf = filter_tf(pB, CB, H, G, mB)
-    stop = time.perf_counter()
-    time_tf = (stop - start) / 100.
+        H = np.ones((4, 4))
+        G = np.ones((4, 4))
 
-    p_f_v, C_f_v = filter_vec(pB, CB, H, G, mB)
-    start = time.perf_counter()
-    for i in range(100) : p_f_v, C_f_v = filter_vec(pB, CB, H, G, mB)
-    stop = time.perf_counter()
-    time_vec = (stop - start) / 100.
+        mB = np.random.normal(size = (n_batch, 4)).T
+        m = mB[:, 0]
 
-    p_f_nv, C_f_nv = filter_novec(p, C, H, G, m)
-    start = time.perf_counter()
-    for i in range(100) : p_f_nv, C_f_nv = filter_novec(p, C, H, G, m)
-    stop = time.perf_counter()
-    time_novec = (stop - start) / 100.
+        p_f_tf, C_f_tf = filter_tf(pB, CB, H, G, mB)
+        start = time.perf_counter()
+        for i in range(20) : p_f_tf, C_f_tf = filter_tf(pB, CB, H, G, mB)
+        stop = time.perf_counter()
+        time_tf = (stop - start) / 20.
 
-    filter_vmap = jit(vmap(filter_novec, in_axes=(0, 0, None, None, 1)))
+        time_tf_list.append(time_tf)
 
-    p_f_av, C_f_av = filter_vmap(pB, CB, H, G, mB)
-    start = time.perf_counter()
-    for i in range(100) : p_f_av, C_f_av = filter_vmap(pB, CB, H, G, mB)
-    stop = time.perf_counter()
-    time_autovec = (stop - start) / 100.
+        p_f_v, C_f_v = filter_vec(pB, CB, H, G, mB)
+        start = time.perf_counter()
+        for i in range(20) : p_f_v, C_f_v = filter_vec(pB, CB, H, G, mB)
+        stop = time.perf_counter()
+        time_vec = (stop - start) / 20.
 
-    # pprint(p_f_av)
-    # pprint(p_f_tf)
-    # pprint(p_f_v)
-    # pprint(p_f_nv)
+        time_vec_list.append(time_vec)
 
-    print('Auto vec', round(time_autovec * 1E3, 3))
-    print('TensorFlow', round(time_tf * 1E3, 3))
-    print('No vec', round(time_novec * 1E3, 3))
-    print('Manual vec', round(time_vec * 1E3, 3))
+        # p_f_nv, C_f_nv = filter_novec(p, C, H, G, m)
+        # start = time.perf_counter()
+        # for i in range(100) : p_f_nv, C_f_nv = filter_novec(p, C, H, G, m)
+        # stop = time.perf_counter()
+        # time_novec = (stop - start) / 100.
+
+        filter_vmap = jit(vmap(filter_novec, in_axes=(0, 0, None, None, 1)))
+
+        p_f_av, C_f_av = filter_vmap(pB, CB, H, G, mB)
+        start = time.perf_counter()
+        for i in range(20) : p_f_av, C_f_av = filter_vmap(pB, CB, H, G, mB)
+        stop = time.perf_counter()
+        time_autovec = (stop - start) / 20.
+
+        time_autovec_list.append(time_autovec)
+
+        # print('Auto vec', round(time_autovec * 1E3, 3))
+        # print('TensorFlow', round(time_tf * 1E3, 3))
+        # print('No vec', round(time_novec * 1E3, 3))
+        # print('Manual vec', round(time_vec * 1E3, 3))
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+
+    ax.plot(batch_sizes, time_tf_list, label = 'TF')
+    ax.plot(batch_sizes, time_vec_list, label = 'Vec')
+    ax.plot(batch_sizes, time_autovec_list, label = 'AutoVec')
+
+    ax.set_yscale('log')
+
+    plt.legend(loc = 0)
+    plt.savefig('jax-test.pdf')
