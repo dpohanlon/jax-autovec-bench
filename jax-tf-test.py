@@ -137,7 +137,10 @@ if __name__ == '__main__':
 
         p_f_v, C_f_v = filter_vec(pB_j, CB_j, H_j, G_j, mB_j)
         start = time.perf_counter()
-        for i in range(20) : p_f_v, C_f_v = filter_vec(pB_j, CB_j, H_j, G_j, mB_j)
+        for i in range(20) :
+            p_f_v, C_f_v = filter_vec(pB_j, CB_j, H_j, G_j, mB_j)
+            p_f_v.block_until_ready()
+            C_f_v.block_until_ready()
         stop = time.perf_counter()
         time_vec = (stop - start) / 20.
 
@@ -161,7 +164,10 @@ if __name__ == '__main__':
 
         p_f_av, C_f_av = filter_vmap(pB_j, CB_j, H_j, G_j, mB_j)
         start = time.perf_counter()
-        for i in range(20) : p_f_av, C_f_av = filter_vmap(pB_j, CB_j, H_j, G_j, mB_j)
+        for i in range(20) :
+            p_f_av, C_f_av = filter_vmap(pB_j, CB_j, H_j, G_j, mB_j)
+            p_f_av.block_until_ready()
+            C_f_av.block_until_ready()
         stop = time.perf_counter()
         time_autovec = (stop - start) / 20.
 
