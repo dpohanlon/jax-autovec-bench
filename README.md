@@ -1,4 +1,4 @@
-# jax-autovec
+# Jax auto-vectorisation benchmark
 
 How does Jax auto-vectorisation compare against manually-vectorised equivalents?
 
@@ -8,4 +8,4 @@ This is a quick benchmark of a section of batched Kalman filter with a matrix in
   <img width="576" height="384" src="plots/jax-test.png">
 </p>
 
-Here NumPy has a natural disadvantage of not being able to make use of all four CPU cores. For this section of code at least, auto-vectorised Jax is able to replicate the performance of the more fiddly manually-vectorised code.
+Here NumPy has a natural disadvantage of not being able to make use of (here) all four CPU cores. For this section of code at least, auto-vectorised Jax is able to replicate the performance of the more fiddly manually-vectorised code.
